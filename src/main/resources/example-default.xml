@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<!--
+    Ignite configuration with all defaults and enabled p2p deployment and enabled events.
+-->
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/util
+        http://www.springframework.org/schema/util/spring-util.xsd">
+
+    <import resource="person-config.xml"/>
+
+    <!-- Datasource for sample in-memory H2 database. -->
+    <!--<bean id="h2-example-db" class="org.h2.jdbcx.JdbcDataSource">-->
+        <!--<property name="URL" value="jdbc:h2:tcp://localhost/mem:ExampleDb" />-->
+        <!--<property name="user" value="sa" />-->
+    <!--</bean>-->
+    <bean id="mysql-example-db" class="com.alibaba.druid.pool.DruidDataSource">
+        <property name="url" value="jdbc:mysql://localhost:3306/bjyaohao_db?useUnicode=true" />
+        <property name="username" value="root" />
+        <property name="password" value="123456" />
+    </bean>
+
+    <bean abstract="true" id="ignite.cfg" class="org.apache.ignite.configuration.IgniteConfiguration">
+        <property name="gridName" value="myGrid"/>
+
+        <property name="cacheConfiguration">
+            <list>
+                <!-- Partitioned cache example configuration (Atomic mode). -->
+                <bean class="org.apache.ignite.configuration.CacheConfiguration">
+                    <property name="name" value="personCache"/>
+                    <property name="atomicityMode" value="TRANSACTIONAL"/>
+                    <property name="cacheMode" value="PARTITIONED"/>
+                    <property name="backups" value="1"/>
+                    <!--<property name="backups" value="0"/>-->
+                    <!-- Set initial cache capacity to ~ 1k. -->
+                    <property name="startSize" value="102400"/>
+                    <!-- Enable off-heap storage with unlimited size. -->
+                    <property name="offHeapMaxMemory" value="0"/>
+                    <!--<property name="copyOnRead" value="false"/>-->
+                    <property name="queryEntities">
+                        <list>
+                            <bean parent="person.cfg"/>
+
+                        </list>
+                    </property>
+                    <!-- 通读、通写配置 -->
+                    <property name="cacheStoreFactory">
+                        <bean class="javax.cache.configuration.FactoryBuilder" factory-method="factoryOf">
+                            <constructor-arg value="cn.mucang.simple.nativecache.ignite.cachestore.PersonCacheStore"/>
+                        </bean>
+                    </property>
+                    <property name="readFromBackup" value="true"/>
+                    <property name="readThrough" value="true"/>
+                    <!-- 这个配置是写入数据库配置，如果不想写入数据库，不需要配置-->
+                    <!--<property name="writeThrough"  value="true"/>-->
+                    <!-- 这个配置是批量写入的配置，会调用writeAll，不配置这个会直接调用write,同时不配置这个后面会调用sessionEnd，配置了就不会调用-->
+                    <property name="writeBehindEnabled" value="true"/>
+                    <property name="writeBehindFlushFrequency" value="1000"/>
+                    <property name="writeBehindFlushSize" value="1000"/>
+                    <property name="writeBehindFlushThreadCount" value="1"/>
+                    <property name="writeSynchronizationMode" value="FULL_ASYNC"/>
+                    <property name="writeBehindBatchSize" value="1000"/>
+
+                </bean>
+            </list>
+        </property>
+        <property name="networkTimeout" value="10000"/>
+        <!-- Set to true to enable distributed class loading for examples, default is false. -->
+        <!--和计算等有关的代码可能是任意自定义的类，在Ignite中， 远程节点会自动感知这些类，
+        不需要显式地将任何jar文件部署或者移动到任何远程节点上。这个行为是通过对等类加载（P2P类加载）实现的，
+        他是Ignite中的一个特别的分布式类加载器，实现了节点间的字节码交换。当对等类加载启用时，
+        不需要在集群内的每个节点上手工地部署代码，也不需要每次在发生变化时重新部署。可以通过如下方法启用对等类加载；
+        但是官方基于性能等原因的考虑，不建议在生产环境中使用对等类加载-->
+        <property name="peerClassLoadingEnabled" value="false"/>
+
+        <!--<property name="sslContextFactory">-->
+            <!--<bean class="org.apache.ignite.ssl.SslContextFactory">-->
+                <!--<property name="protocol" value="SSL"/>-->
+                <!--<property name="keyStoreFilePath" value=""/>-->
+                <!--<property name="keyStorePassword" value=""/>-->
+                <!--<property name="trustStoreFilePath" value=""/>-->
+                <!--<property name="trustStorePassword" value=""/>-->
+                <!--<property name="trustManagers">-->
+                    <!--<bean class="org.apache.ignite.ssl.SslContextFactory" factory-method="getDisabledTrustManager"/>-->
+                <!--</property>-->
+            <!--</bean>-->
+        <!--</property>-->
+
+        <!--自定义的节点属性,通过节点的属性可以获得对应的节点
+        ClusterGroup workers = ignite.cluster().forAttribute("ROLE", "worker");
+        Collection<ClusterNode> nodes = workers.nodes();
+        -->
+        <property name="userAttributes">
+            <map>
+                <entry key="ROLE" value="worker"/>
+            </map>
+        </property>
+
+        <!-- Enable task execution events for examples. -->
+        <property name="includeEventTypes">
+            <list>
+                <!--Task execution events-->
+                <util:constant static-field="org.apache.ignite.events.EventType.EVT_TASK_STARTED"/>
+                <util:constant static-field="org.apache.ignite.events.EventType.EVT_TASK_FINISHED"/>
+                <util:constant static-field="org.apache.ignite.events.EventType.EVT_TASK_FAILED"/>
+                <util:constant static-field="org.apache.ignite.events.EventType.EVT_TASK_TIMEDOUT"/>
+                <util:constant static-field="org.apache.ignite.events.EventType.EVT_TASK_SESSION_ATTR_SET"/>
+                <util:constant static-field="org.apache.ignite.events.EventType.EVT_TASK_REDUCED"/>
+
+                <!--Cache events-->
+                <util:constant static-field="org.apache.ignite.events.EventType.EVT_CACHE_OBJECT_PUT"/>
+                <util:constant static-field="org.apache.ignite.events.EventType.EVT_CACHE_OBJECT_READ"/>
+                <util:constant static-field="org.apache.ignite.events.EventType.EVT_CACHE_OBJECT_REMOVED"/>
+            </list>
+        </property>
+
+        <!-- Explicitly configure TCP discovery SPI to provide list of initial nodes. -->
+        <property name="discoverySpi">
+            <bean class="org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi">
+                <property name="ipFinder">
+                    <!--
+                        Ignite provides several options for automatic discovery that can be used
+                        instead os static IP based discovery. For information on all options refer
+                        to our documentation: http://apacheignite.readme.io/docs/cluster-config
+                    -->
+                    <!-- Uncomment static IP finder to enable static-based discovery of initial nodes. -->
+                    <!--<bean class="org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder">-->
+                    <bean class="org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder">
+                        <property name="addresses">
+                            <list>
+                                <!-- In distributed environment, replace with actual host IP address. -->
+                                <value>127.0.0.1:47500..47509</value>
+                                <value>192.168.1.247:47510..47519</value>
+                            </list>
+                        </property>
+                        <!--基于多播的发现-->
+                        <!--<property name="multicastGroup" value="127.0.0.1"/>-->
+                    </bean>
+                </property>
+            </bean>
+        </property>
+
+    </bean>
+</beans>

@@ -1,0 +1,341 @@
+package cn.mucang.simple.nativecache.db;
+
+import cn.mucang.simple.utils.CollectionUtils;
+import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.Table;
+import org.apache.commons.lang3.StringUtils;
+
+import java.lang.reflect.Field;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * Created by liangzhiyan on 2017/1/9.
+ */
+public class DB {
+
+
+    /**
+     * 存储每一列值对应的行号
+     */
+    private Map<String, Set<Long>> lineMap = new HashMap<>();
+
+    /**
+     * 存储每一行的数据
+     */
+    private Table<Class, Long, Object> tableLineData = HashBasedTable.create();
+
+    /**
+     * 字典树，用了对String做前缀匹配
+     */
+    private Trie trie = new Trie();
+
+    private class Note {
+        private long line;
+        private String table;
+        private Object data;
+        private String columnName;
+        private ColumnType columnType;
+
+        public Note(long line, String table, Object data, String columnName, ColumnType columnType) {
+            this.line = line;
+            this.table = table;
+            this.data = data;
+            this.columnName = columnName;
+            this.columnType = columnType;
+        }
+
+        public long getLine() {
+            return line;
+        }
+
+        public void setLine(long line) {
+            this.line = line;
+        }
+
+        public String getTable() {
+            return table;
+        }
+
+        public void setTable(String table) {
+            this.table = table;
+        }
+
+        public Object getData() {
+            return data;
+        }
+
+        public void setData(Object data) {
+            this.data = data;
+        }
+
+        public String getColumnName() {
+            return columnName;
+        }
+
+        public void setColumnName(String columnName) {
+            this.columnName = columnName;
+        }
+
+        public ColumnType getColumnType() {
+            return columnType;
+        }
+
+        public void setColumnType(ColumnType columnType) {
+            this.columnType = columnType;
+        }
+    }
+
+
+    public String buildKey(String tableName, String columnName, Object columnValue) {
+        return tableName + "-" + columnName + "-" + columnValue == null ? "" : columnValue.toString();
+    }
+
+
+    private enum ColumnType {
+        BOOLEAN, BIT, CHAR, SHORT, INT, LONG, FLOAT, DOUBLE, STRING, DATE, DATE_TIME, LIST, SET, MAP;
+
+        private static ColumnType getColumnType(String name) {
+            if (StringUtils.equals(name, "int") || StringUtils.equals(name, "java.lang.Integer")) {
+                return INT;
+            } else if (StringUtils.equals(name, "java.lang.String")) {
+                return STRING;
+            } else if (StringUtils.equals(name, "java.util.Date")) {
+                return DATE;
+            }
+            return BIT;
+        }
+    }
+
+    public static void main(String[] args) {
+        DB db = new DB();
+        String[] address = {"北京", "上海", "深圳", "广州", "南宁"};
+        try {
+            for (int i = 0; i < 100; i++) {
+                String add = address[i % 5] + i % 10;
+                System.out.println(add);
+                Emp emp = new Emp("test" + i % 10, add, i, new Date());
+                db.insert(emp);
+            }
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+//        System.out.println(db.get(Emp.class, "address", "beijing1"));
+        System.out.println(db.getLike(Emp.class, "address", "南宁"));
+    }
+
+    public <T> List<T> get(Class table, String columnName, Object param) {
+        String key = buildKey(table.getName(), columnName, param);
+        Set<Long> lineSet = lineMap.get(key);
+        List<T> result = new ArrayList<>();
+        for (Long line : lineSet) {
+            result.add((T) tableLineData.get(table, line));
+        }
+        return result;
+    }
+
+    public <T> List<T> getLike(Class table, String columnName, String param) {
+        Set<Long> lineSet = trie.searchLine(table, columnName, param);
+        if (CollectionUtils.isEmpty(lineSet)) {
+            return Collections.emptyList();
+        } else {
+            List<T> result = new ArrayList<>();
+            for (Long line : lineSet) {
+                result.add((T) tableLineData.get(table, line));
+            }
+            return result;
+        }
+    }
+
+    public <T> List<T> getAll(Class table) {
+        Collection<Object> collection = tableLineData.row(table).values();
+        List<T> result = new ArrayList<>();
+        for (Object object : collection) {
+            result.add((T) object);
+        }
+        return result;
+    }
+
+    public <T> T join(Join join) {
+        Map<String,Object> leftColumnValue = join.getLeftColumnValue();
+        if (CollectionUtils.isNotEmpty(leftColumnValue)){
+
+        }
+        return null;
+    }
+
+    public void insert(Object object) throws IllegalAccessException {
+        Class clazz = object.getClass();
+        Field[] fields = clazz.getDeclaredFields();
+        long line = generateLine();
+        String table = clazz.getName();
+        for (Field field : fields) {
+            String fieldName = field.getName();
+            field.setAccessible(true);
+            Object value = field.get(object);
+            field.setAccessible(false);
+            String typeName = field.getGenericType().getTypeName();
+            ColumnType columnType = ColumnType.getColumnType(typeName);
+            Note note = createNote(line, table, value, fieldName, columnType);
+            putColumn(line, table, fieldName, value);
+            if (columnType == ColumnType.STRING && value != null) {
+                trie.insert(clazz, fieldName, value.toString(), line);
+            }
+        }
+        putTable(clazz, line, object);
+    }
+
+    private void putColumn(long line, String tableName, String columnName, Object columnValue) {
+        String key = buildKey(tableName, columnName, columnValue);
+        if (lineMap.containsKey(key)) {
+            lineMap.get(key).add(line);
+        } else {
+            Set<Long> set = new HashSet<>();
+            set.add(line);
+            lineMap.put(key, set);
+        }
+    }
+
+    private void putTable(Class table, long line, Object value) {
+        tableLineData.put(table, line, value);
+    }
+
+    private Note createNote(long line, String table, Object data, String columnName, ColumnType columnType) {
+        Note note = new Note(line, table, data, columnName, columnType);
+        return note;
+    }
+
+    private AtomicLong line = new AtomicLong(0);
+
+    private long generateLine() {
+        return line.incrementAndGet();
+    }
+
+    public static class Join {
+        private Class leftTable;
+        private Class rightTable;
+        private List<Pair> pairList;
+        private Map<String, Object> leftColumnValue;
+        private Map<String, Object> rightColumnValue;
+
+        public Class getLeftTable() {
+            return leftTable;
+        }
+
+        public void setLeftTable(Class leftTable) {
+            this.leftTable = leftTable;
+        }
+
+        public Class getRightTable() {
+            return rightTable;
+        }
+
+        public void setRightTable(Class rightTable) {
+            this.rightTable = rightTable;
+        }
+
+        public List<Pair> getPairList() {
+            return pairList;
+        }
+
+        public void setPairList(List<Pair> pairList) {
+            this.pairList = pairList;
+        }
+
+        public Map<String, Object> getLeftColumnValue() {
+            return leftColumnValue;
+        }
+
+        public void setLeftColumnValue(Map<String, Object> leftColumnValue) {
+            this.leftColumnValue = leftColumnValue;
+        }
+
+        public Map<String, Object> getRightColumnValue() {
+            return rightColumnValue;
+        }
+
+        public void setRightColumnValue(Map<String, Object> rightColumnValue) {
+            this.rightColumnValue = rightColumnValue;
+        }
+    }
+
+    public static class Pair {
+        private String leftColumn;
+        private String rightColumn;
+
+        public String getLeftColumn() {
+            return leftColumn;
+        }
+
+        public void setLeftColumn(String leftColumn) {
+            this.leftColumn = leftColumn;
+        }
+
+        public String getRightColumn() {
+            return rightColumn;
+        }
+
+        public void setRightColumn(String rightColumn) {
+            this.rightColumn = rightColumn;
+        }
+    }
+
+    private static class Emp {
+        private String userName;
+        private String address;
+        private int age;
+        private Date birthDay;
+
+        public Emp() {
+        }
+
+        public Emp(String userName, String address, int age, Date birthDay) {
+            this.userName = userName;
+            this.address = address;
+            this.age = age;
+            this.birthDay = birthDay;
+        }
+
+        public String getUserName() {
+            return userName;
+        }
+
+        public void setUserName(String userName) {
+            this.userName = userName;
+        }
+
+        public String getAddress() {
+            return address;
+        }
+
+        public void setAddress(String address) {
+            this.address = address;
+        }
+
+        public int getAge() {
+            return age;
+        }
+
+        public void setAge(int age) {
+            this.age = age;
+        }
+
+        public Date getBirthDay() {
+            return birthDay;
+        }
+
+        public void setBirthDay(Date birthDay) {
+            this.birthDay = birthDay;
+        }
+
+        @Override
+        public String toString() {
+            return "Emp{" +
+                    "userName='" + userName + '\'' +
+                    ", address='" + address + '\'' +
+                    ", age=" + age +
+                    ", birthDay=" + birthDay +
+                    '}';
+        }
+    }
+}
