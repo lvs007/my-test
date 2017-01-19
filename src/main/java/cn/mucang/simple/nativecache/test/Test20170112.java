@@ -7,6 +7,12 @@ package cn.mucang.simple.nativecache.test;
 public class Test20170112 {
 
     public static void main(String[] args) {
+        String packageName = "com.liang.controller";
+        String packagePattern = "\\.*controller.?";
+        packagePattern = packagePattern.replaceAll("\\.+$", "");
 
+        packageName = packageName.replaceAll(packagePattern,"/v1/");
+        System.out.println(packagePattern);
+        System.out.println(packageName);
     }
 }

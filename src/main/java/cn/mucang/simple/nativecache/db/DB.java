@@ -14,6 +14,8 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class DB {
 
+    private static final String INDEX_SPLIT = "-";
+    private static final String INDEX_VALUE_SPLIT = "#";
 
     /**
      * 存储每一列值对应的行号
@@ -29,6 +31,15 @@ public class DB {
      * 字典树，用了对String做前缀匹配
      */
     private Trie trie = new Trie();
+
+    /**
+     * 存储每个表的索引信息，key是全表名，value是索引值
+     * 联合索引，用-隔开
+     */
+    private Map<String, Set<String>> indexMap = new HashMap<>();
+
+    //临时的索引存储，用来生成索引数据
+    private Map<String, String> linshiIndexMap = new HashMap<>();
 
     private class Note {
         private long line;
@@ -156,14 +167,24 @@ public class DB {
         return result;
     }
 
+    private Map<Long, Object> getAllInfo(Class table) {
+        return tableLineData.row(table);
+    }
+
     public <T> T join(Join join) {
-        Map<String,Object> leftColumnValue = join.getLeftColumnValue();
-        if (CollectionUtils.isNotEmpty(leftColumnValue)){
+        Map<String, Object> leftColumnValue = join.getLeftColumnValue();
+        if (CollectionUtils.isNotEmpty(leftColumnValue)) {
 
         }
         return null;
     }
 
+    /**
+     * 插入一条数据
+     *
+     * @param object
+     * @throws IllegalAccessException
+     */
     public void insert(Object object) throws IllegalAccessException {
         Class clazz = object.getClass();
         Field[] fields = clazz.getDeclaredFields();
@@ -203,6 +224,56 @@ public class DB {
     private Note createNote(long line, String table, Object data, String columnName, ColumnType columnType) {
         Note note = new Note(line, table, data, columnName, columnType);
         return note;
+    }
+
+    public void createIndex(Class table, String... columnNames) throws NoSuchFieldException, IllegalAccessException {
+        if (columnNames == null) {
+            return;
+        }
+        String value = "";
+        for (String columnName : columnNames) {
+            value += columnName + INDEX_SPLIT;
+        }
+        value = value.substring(0, value.length() - 2);
+        String key = table.getName();
+        linshiIndexMap.put(key, value);
+        if (indexMap.containsKey(key)) {
+            indexMap.get(key).add(value);
+        } else {
+            Set<String> set = new HashSet<>();
+            set.add(value);
+            indexMap.put(key, set);
+        }
+        //生成索引数据
+        createIndexData(table);
+    }
+
+    public void createIndexData(Class table) throws NoSuchFieldException, IllegalAccessException {
+        String index = linshiIndexMap.get(table.getName());
+        if (StringUtils.isBlank(index)) {
+            return;
+        }
+        Map<Long, Object> lineDataMap = getAllInfo(table);
+        String[] columns = index.split(INDEX_SPLIT);
+        for (Map.Entry<Long, Object> entry : lineDataMap.entrySet()) {
+            long line = entry.getKey();
+            Object object = entry.getValue();
+            createIndexData(object, index, line);
+        }
+    }
+
+    private void createIndexData(Object object, String index, long line) throws NoSuchFieldException, IllegalAccessException {
+        String[] columns = index.split(INDEX_SPLIT);
+        Class clazz = object.getClass();
+        String indexValue = "";
+        for (String column : columns) {
+            Field field = clazz.getDeclaredField(column);
+            field.setAccessible(true);
+            Object value = field.get(object);
+            indexValue += value == null ? "NULL" : value.toString();
+            field.setAccessible(false);
+        }
+        trie.insert(clazz, index, indexValue, line);
     }
 
     private AtomicLong line = new AtomicLong(0);
