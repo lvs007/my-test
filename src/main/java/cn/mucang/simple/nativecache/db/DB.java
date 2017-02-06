@@ -3,6 +3,7 @@ package cn.mucang.simple.nativecache.db;
 import cn.mucang.simple.utils.CollectionUtils;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.lang.reflect.Field;
@@ -123,16 +124,30 @@ public class DB {
         String[] address = {"北京", "上海", "深圳", "广州", "南宁"};
         try {
             for (int i = 0; i < 100; i++) {
-                String add = address[i % 5] + i % 10;
-                System.out.println(add);
+                String add = address[i % 5] ;
+//                System.out.println(add);
                 Emp emp = new Emp("test" + i % 10, add, i, new Date());
                 db.insert(emp);
             }
+            db.createUnionIndex(Emp.class, "address", "userName");
         } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (NoSuchFieldException e) {
             e.printStackTrace();
         }
 //        System.out.println(db.get(Emp.class, "address", "beijing1"));
-        System.out.println(db.getLike(Emp.class, "address", "南宁"));
+//        System.out.println(db.getLike(Emp.class, "address", "南宁"));
+        Map<String, Object> map = new HashMap<>();
+        map.put("address", "南宁");
+        map.put("userName", "test9");
+        map.put("age",79);
+        try {
+            System.out.println(db.get(Emp.class, map));
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
     }
 
     public <T> List<T> get(Class table, String columnName, Object param) {
@@ -165,6 +180,100 @@ public class DB {
             result.add((T) object);
         }
         return result;
+    }
+
+    /**
+     * 支持联合索引
+     *
+     * @param table
+     * @param columnAndValueMap 联合索引集合，必须是两个或两个以上的字段
+     * @param <T>
+     * @return
+     */
+    public <T> List<T> get(Class table, Map<String, Object> columnAndValueMap) throws NoSuchFieldException, IllegalAccessException {
+
+        if (columnAndValueMap == null || columnAndValueMap.size() <= 1) {
+            throw new RuntimeException("不支持这种方式参数的查询");
+        }
+        Set<String> keySet = columnAndValueMap.keySet();
+        Set<String> tableIndex = indexMap.get(table.getName());
+        BestIndex bestIndex = findBestMatch(tableIndex, keySet);//找到最佳的索引
+        List<T> result = null;
+        if (bestIndex.getCount() > 1) {//匹配上联合索引
+            result = matchUnionIndex(bestIndex, table, columnAndValueMap);
+        } else if (bestIndex.getCount() == 1) {//匹配上单一索引
+            result = matchOnlyIndex(bestIndex, table, columnAndValueMap);
+        } else {//没有匹配上索引
+            result = getAll(table);
+        }
+        if (MapUtils.isNotEmpty(columnAndValueMap)) {
+            Iterator<T> iterator = result.iterator();
+            while (iterator.hasNext()) {
+                T t = iterator.next();
+                boolean tag = true;
+                for (String column : columnAndValueMap.keySet()) {
+                    Object value = ReflectUtils.getValue(t, column);
+                    if (value == null && columnAndValueMap.get(column) == null) {
+                        continue;
+                    } else if (value == null || columnAndValueMap.get(column) == null
+                            || !StringUtils.equals(value.toString(), columnAndValueMap.get(column).toString())) {
+                        tag = false;
+                        break;
+                    }
+                }
+                if (!tag) {
+                    iterator.remove();
+                }
+            }
+        }
+        return result;
+    }
+
+    private <T> List<T> matchOnlyIndex(BestIndex bestIndex, Class table, Map<String, Object> columnAndValueMap) {
+        return get(table, bestIndex.getIndex(), columnAndValueMap.remove(bestIndex.getIndex()));
+    }
+
+    private <T> List<T> matchUnionIndex(BestIndex bestIndex, Class table, Map<String, Object> columnAndValueMap) {
+        String[] indexArray = StringUtils.split(bestIndex.getIndex(), INDEX_SPLIT);
+        String indexValue = "";
+        for (int i = 0; i < bestIndex.getCount(); i++) {
+            Object value = columnAndValueMap.remove(indexArray[i]);
+            if (i == 0) {
+                indexValue += (value == null ? "NULL" : value.toString());
+            } else {
+                indexValue += INDEX_VALUE_SPLIT + (value == null ? "NULL" : value.toString());
+            }
+        }
+        Set<Long> lineSet = trie.searchLine(table, bestIndex.getIndex(), indexValue);
+        List<T> result = new ArrayList<>();
+        for (Long line : lineSet) {
+            result.add((T) tableLineData.get(table, line));
+        }
+        return result;
+    }
+
+    private BestIndex findBestMatch(Set<String> tableIndex, Set<String> keySet) {
+        int best = 0;
+        String result = "";
+        BestIndex bestIndex = new BestIndex();
+        for (String index : tableIndex) {
+            String[] indexArray = StringUtils.split(index, INDEX_SPLIT);
+            int count = 0;
+            for (String column : indexArray) {
+                if (keySet.contains(column)) {
+                    ++count;
+                } else {
+                    break;
+                }
+            }
+            if (count > best) {
+                best = count;
+                result = index;
+            }
+        }
+        bestIndex.setCount(best);
+        bestIndex.setIndex(result);
+        return bestIndex;
     }
 
     private Map<Long, Object> getAllInfo(Class table) {
@@ -226,15 +335,15 @@ public class DB {
         return note;
     }
 
-    public void createIndex(Class table, String... columnNames) throws NoSuchFieldException, IllegalAccessException {
-        if (columnNames == null) {
+    public synchronized void createUnionIndex(Class table, String... columnNames) throws NoSuchFieldException, IllegalAccessException {
+        if (columnNames == null || columnNames.length <= 1) {
             return;
         }
         String value = "";
         for (String columnName : columnNames) {
             value += columnName + INDEX_SPLIT;
         }
-        value = value.substring(0, value.length() - 2);
+        value = value.substring(0, value.length() - 1);
         String key = table.getName();
         linshiIndexMap.put(key, value);
         if (indexMap.containsKey(key)) {
@@ -254,7 +363,6 @@ public class DB {
             return;
         }
         Map<Long, Object> lineDataMap = getAllInfo(table);
-        String[] columns = index.split(INDEX_SPLIT);
         for (Map.Entry<Long, Object> entry : lineDataMap.entrySet()) {
             long line = entry.getKey();
             Object object = entry.getValue();
@@ -266,13 +374,20 @@ public class DB {
         String[] columns = index.split(INDEX_SPLIT);
         Class clazz = object.getClass();
         String indexValue = "";
+        boolean tag = false;
         for (String column : columns) {
             Field field = clazz.getDeclaredField(column);
             field.setAccessible(true);
             Object value = field.get(object);
-            indexValue += value == null ? "NULL" : value.toString();
+            if (tag) {
+                indexValue += INDEX_VALUE_SPLIT + (value == null ? "NULL" : value.toString());
+            } else {
+                indexValue += (value == null ? "NULL" : value.toString());
+            }
             field.setAccessible(false);
+            tag = true;
         }
+        System.out.println(index + "\t" + indexValue + "\t" + line);
         trie.insert(clazz, index, indexValue, line);
     }
 
@@ -280,6 +395,27 @@ public class DB {
 
     private long generateLine() {
         return line.incrementAndGet();
+    }
+
+    private class BestIndex {
+        private int count;//匹配上的列数量
+        private String index;//完整的索引
+
+        public int getCount() {
+            return count;
+        }
+
+        public void setCount(int count) {
+            this.count = count;
+        }
+
+        public String getIndex() {
+            return index;
+        }
+
+        public void setIndex(String index) {
+            this.index = index;
+        }
     }
 
     public static class Join {

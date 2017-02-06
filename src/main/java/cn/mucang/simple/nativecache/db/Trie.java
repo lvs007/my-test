@@ -60,6 +60,14 @@ public class Trie {
         return found;
     }
 
+    /**
+     * 根据条件查询满足条件的所有行数据
+     *
+     * @param table
+     * @param column
+     * @param word
+     * @return 返回满足条件的所有行
+     */
     public Set<Long> searchLine(Class table, String column, String word) {
         TrieNode node = root;
         String key = buildKey(table, column);
