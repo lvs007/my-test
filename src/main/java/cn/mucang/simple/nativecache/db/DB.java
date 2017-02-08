@@ -3,7 +3,6 @@ package cn.mucang.simple.nativecache.db;
 import cn.mucang.simple.utils.CollectionUtils;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.lang.reflect.Field;
@@ -18,10 +17,12 @@ public class DB {
     static final String INDEX_SPLIT = "-";
     static final String INDEX_VALUE_SPLIT = "#";
 
+    static final String END_SYMBOL = "`";
+
     /**
      * 存储每一列值对应的行号
      */
-    private Map<String, Set<Long>> lineMap = new HashMap<>();
+    Map<String, Set<Long>> lineMap = new HashMap<>();
 
     /**
      * 存储每一行的数据
@@ -130,13 +131,13 @@ public class DB {
         String[] address = {"北京", "上海", "深圳", "广州", "南宁"};
         long beginTime = System.currentTimeMillis();
         try {
-            for (int i = 0; i < 400000; i++) {
+            for (int i = 0; i < 100000; i++) {
                 String add = address[i % 5];
 //                System.out.println(add);
                 Emp emp = new Emp("test" + i % 10, add, i, new Date());
                 db.insert(emp);
             }
-            db.createUnionIndex(Emp.class, "address", "userName","age");
+            db.createUnionIndex(Emp.class, "address", "userName", "age");
         } catch (IllegalAccessException e) {
             e.printStackTrace();
         } catch (NoSuchFieldException e) {
@@ -146,27 +147,39 @@ public class DB {
         System.out.println("create index spend time : " + (endTime - beginTime));
 //        System.out.println(db.get(Emp.class, "address", "beijing1"));
 //        System.out.println(db.getLike(Emp.class, "address", "南宁"));
-        Map<String, Object> map = new HashMap<>();
-        map.put("address", "南宁");
-        map.put("userName", "test9");
-        map.put("age", 79);
-        try {
-            System.out.println(db.get(Emp.class, map));
-        } catch (Exception e) {
-            e.printStackTrace();
+//        {
+//            Map<String, Object> map = new HashMap<>();
+//            map.put("address", "南宁");
+//            map.put("userName", "test9");
+//            map.put("age", 79);
+//            try {
+//                System.out.println(db.get(Emp.class, map));
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//        }
+        {
+            try {
+                List<QueryCondition> conditionList = new ArrayList<>();
+                QueryCondition condition1 = new QueryCondition("address","南宁",Condition.EQ);
+                QueryCondition condition2 = new QueryCondition("age",25,Condition.LTE);
+                conditionList.add(condition1);
+                conditionList.add(condition2);
+                System.out.println(db.get(Emp.class, conditionList));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         long findTime = System.currentTimeMillis();
         System.out.println("find spend time : " + (findTime - endTime));
     }
 
+    public <T> List<T> get(Class table, List<QueryCondition> conditionList) throws Exception {
+        return query.get(table, conditionList);
+    }
+
     public <T> List<T> get(Class table, String columnName, Object param) {
-        String key = buildKey(table.getName(), columnName, param);
-        Set<Long> lineSet = lineMap.get(key);
-        List<T> result = new ArrayList<>();
-        for (Long line : lineSet) {
-            result.add((T) tableLineData.get(table, line));
-        }
-        return result;
+        return query.get(table, columnName, param);
     }
 
     public <T> List<T> getLike(Class table, String columnName, String param) {
@@ -315,7 +328,7 @@ public class DB {
             tag = true;
         }
 //        System.out.println(index + "\t" + indexValue + "\t" + line);
-        trie.insert(clazz, index, indexValue, line);
+        trie.insert(clazz, index, indexValue + END_SYMBOL, line);
     }
 
     private AtomicLong line = new AtomicLong(0);

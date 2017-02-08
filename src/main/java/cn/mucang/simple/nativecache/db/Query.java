@@ -25,5 +25,5 @@ public interface Query {
 
     public <T> List<T> getAll(Class table);
 
-    public <T> List<T> get(Class table, List<QueryCondition> conditionList);
+    public <T> List<T> get(Class table, List<QueryCondition> conditionList) throws Exception;
 }

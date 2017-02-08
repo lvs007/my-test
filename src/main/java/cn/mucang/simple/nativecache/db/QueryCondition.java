@@ -9,9 +9,6 @@ public class QueryCondition {
     private Object value;
     private Condition condition;
 
-    public QueryCondition() {
-    }
-
     public QueryCondition(String column, Object value, Condition condition) {
         this.column = column;
         this.value = value;
