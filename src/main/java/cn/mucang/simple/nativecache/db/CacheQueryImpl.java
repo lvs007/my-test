@@ -20,9 +20,6 @@ public class CacheQueryImpl implements Query {
 
     @Override
     public <T> List<T> get(Class table, Map<String, Object> columnAndValueMap) throws Exception {
-        if (columnAndValueMap == null || columnAndValueMap.size() <= 1) {
-            throw new RuntimeException("不支持这种方式参数的查询");
-        }
         List<T> result = getByUnionIndex(table, columnAndValueMap);
         if (MapUtils.isNotEmpty(columnAndValueMap)) {
             Iterator<T> iterator = result.iterator();
@@ -48,6 +45,9 @@ public class CacheQueryImpl implements Query {
     }
 
     private <T> List<T> getByUnionIndex(Class table, Map<String, Object> columnAndValueMap) {
+        if (columnAndValueMap == null || columnAndValueMap.size() <= 1) {
+            throw new RuntimeException("不支持这种方式参数的查询");
+        }
         Set<String> keySet = columnAndValueMap.keySet();
         Set<String> tableIndex = db.indexMap.get(table.getName());
         BestIndex bestIndex = findBestMatch(tableIndex, keySet);//找到最佳的索引
@@ -87,11 +87,17 @@ public class CacheQueryImpl implements Query {
     public <T> List<T> get(Class table, List<QueryCondition> conditionList) throws Exception {
         Map<String, Object> columnValueMap = new HashMap<>();
         Iterator<QueryCondition> iterator = conditionList.iterator();
+        QueryCondition groupByCondition = null;
+        QueryCondition orderByCondition = null;
         while (iterator.hasNext()) {
             QueryCondition queryCondition = iterator.next();
             if (queryCondition.getCondition() == Condition.EQ) {
                 columnValueMap.put(queryCondition.getColumn(), queryCondition.getValue());
                 iterator.remove();
+            } else if (queryCondition.getCondition() == Condition.GROUP_BY) {
+                groupByCondition = queryCondition;
+            } else if (queryCondition.getCondition() == Condition.ORDER_BY) {
+                orderByCondition = queryCondition;
             }
         }
         List<T> midResult;
@@ -104,7 +110,22 @@ public class CacheQueryImpl implements Query {
             midResult = getAll(table);
         }
         filterResultByCondition(midResult, conditionList);
+        groupBy(midResult, groupByCondition);
+        orderBy(midResult, orderByCondition);
         return midResult;
+    }
+
+    private <T> void groupBy(List<T> midResult, QueryCondition groupByCondition) {
+        if (groupByCondition == null) {
+            return;
+        }
+
+    }
+
+    private <T> void orderBy(List<T> midResult, QueryCondition orderByCondition) {
+        if (orderByCondition == null) {
+            return;
+        }
     }
 
     private <T> void filterResultByCondition(List<T> midResult, List<QueryCondition> conditionList) throws NoSuchFieldException, IllegalAccessException {
@@ -114,21 +135,29 @@ public class CacheQueryImpl implements Query {
                 T t = iterator.next();
                 boolean tag = true;
                 for (QueryCondition queryCondition : conditionList) {
+                    Object value = ReflectUtils.getValue(t, queryCondition.getColumn());
                     switch (queryCondition.getCondition()) {
                         case GT:
                         case GTE:
                         case LT:
                         case LTE: {
-                            Object value = ReflectUtils.getValue(t, queryCondition.getColumn());
                             if (!compare(value, queryCondition.getValue(), queryCondition.getCondition())) {
                                 tag = false;
                             }
                         }
                         break;
-                        case IN:
-                            break;
-                        case LIKE:
-                            break;
+                        case IN: {
+                            if (!in(value, queryCondition.getValue())) {
+                                tag = false;
+                            }
+                        }
+                        break;
+                        case LIKE: {
+                            if (!like(value, queryCondition.getValue())) {
+                                tag = false;
+                            }
+                        }
+                        break;
                     }
                     if (!tag) {
                         break;
@@ -138,6 +167,31 @@ public class CacheQueryImpl implements Query {
                     iterator.remove();
                 }
             }
+        }
+    }
+
+    private boolean like(Object value, Object compareValue) {
+        if (StringUtils.contains(String.valueOf(value), String.valueOf(compareValue))) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean in(Object value, Object compareValue) {
+        String valueType = compareValue.getClass().getTypeName();
+        Set<Object> set = new HashSet<>();
+        if (StringUtils.contains(valueType, "List")) {
+            List list = (List) compareValue;
+            set.addAll(list);
+        } else {
+            Object[] objects = (Object[]) compareValue;
+            set.addAll(Arrays.asList(objects));
+        }
+        if (set.contains(value)) {
+            return true;
+        } else {
+            return false;
         }
     }
 
@@ -211,13 +265,39 @@ public class CacheQueryImpl implements Query {
             }
         } else if (StringUtils.equalsIgnoreCase(valueType, "java.lang.Character") ||
                 StringUtils.equalsIgnoreCase(valueType, "char")) {
-
+            Character valueChar = (Character) value;
+            Character compareValueChar = (Character) compareValue;
+            if (condition == Condition.GT) {
+                return valueChar > compareValueChar;
+            } else if (condition == Condition.GTE) {
+                return valueChar >= compareValueChar;
+            } else if (condition == Condition.LT) {
+                return valueChar < compareValueChar;
+            } else if (condition == Condition.LTE) {
+                return valueChar <= compareValueChar;
+            }
         } else if (StringUtils.equalsIgnoreCase(valueType, "java.lang.Short") ||
                 StringUtils.equalsIgnoreCase(valueType, "short")) {
-
+            if (condition == Condition.GT) {
+                return Short.parseShort(value.toString()) > Short.parseShort(compareValue.toString());
+            } else if (condition == Condition.GTE) {
+                return Short.parseShort(value.toString()) >= Short.parseShort(compareValue.toString());
+            } else if (condition == Condition.LT) {
+                return Short.parseShort(value.toString()) < Short.parseShort(compareValue.toString());
+            } else if (condition == Condition.LTE) {
+                return Short.parseShort(value.toString()) <= Short.parseShort(compareValue.toString());
+            }
         } else if (StringUtils.equalsIgnoreCase(valueType, "java.lang.Byte") ||
                 StringUtils.equalsIgnoreCase(valueType, "byte")) {
-
+            if (condition == Condition.GT) {
+                return Byte.parseByte(value.toString()) > Byte.parseByte(compareValue.toString());
+            } else if (condition == Condition.GTE) {
+                return Byte.parseByte(value.toString()) >= Byte.parseByte(compareValue.toString());
+            } else if (condition == Condition.LT) {
+                return Byte.parseByte(value.toString()) < Byte.parseByte(compareValue.toString());
+            } else if (condition == Condition.LTE) {
+                return Byte.parseByte(value.toString()) <= Byte.parseByte(compareValue.toString());
+            }
         }
         return false;
     }

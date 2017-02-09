@@ -131,7 +131,7 @@ public class DB {
         String[] address = {"北京", "上海", "深圳", "广州", "南宁"};
         long beginTime = System.currentTimeMillis();
         try {
-            for (int i = 0; i < 100000; i++) {
+            for (int i = 0; i < 400000; i++) {
                 String add = address[i % 5];
 //                System.out.println(add);
                 Emp emp = new Emp("test" + i % 10, add, i, new Date());
@@ -162,9 +162,14 @@ public class DB {
             try {
                 List<QueryCondition> conditionList = new ArrayList<>();
                 QueryCondition condition1 = new QueryCondition("address","南宁",Condition.EQ);
-                QueryCondition condition2 = new QueryCondition("age",25,Condition.LTE);
+                QueryCondition condition2 = new QueryCondition("age",25,Condition.GTE);
+                QueryCondition condition3 = new QueryCondition("userName",new String[]{"test1","test4"},Condition.IN);
+                QueryCondition condition4 = new QueryCondition("age","5",Condition.LIKE);
+
                 conditionList.add(condition1);
                 conditionList.add(condition2);
+                conditionList.add(condition3);
+                conditionList.add(condition4);
                 System.out.println(db.get(Emp.class, conditionList));
             } catch (Exception e) {
                 e.printStackTrace();
