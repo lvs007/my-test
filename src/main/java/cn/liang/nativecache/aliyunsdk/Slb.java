@@ -86,8 +86,6 @@ public class Slb extends Base {
 
     public static void main(String[] args) {
         try {
-//            getRdsList();
-//            getBalance("open.res.kakamobi.cn");
             update();
 //            getEcs();
         } catch (Exception e) {

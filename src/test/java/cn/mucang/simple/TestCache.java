@@ -124,7 +124,6 @@ public class TestCache {
     @Test
     public void testTTT(){
         MonitorManager monitorManager = new MonitorManager();
-//        monitorManager.setHost("http://polaris.kakamobi.cn");
         monitorManager.set("key-13","test",10);
     }
 }
