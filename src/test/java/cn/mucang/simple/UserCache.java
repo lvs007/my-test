@@ -1,11 +1,10 @@
 package cn.mucang.simple;
 
 import cn.mucang.simple.entity.TestEntity;
-import cn.mucang.simple.nativecache.news.AbstractLoadingCacheService;
+import cn.liang.nativecache.news.AbstractLoadingCacheService;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 /**
  * Created by mc-050 on 2016/3/16.

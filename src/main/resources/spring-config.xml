@@ -200,7 +200,7 @@
             </bean>
         </property>
     </bean>
-    <bean id="sparkIgniteService" class="cn.mucang.simple.nativecache.ignite.spark.SparkIgniteServiceImpl">
+    <bean id="sparkIgniteService" class="cn.liang.nativecache.ignite.spark.SparkIgniteServiceImpl">
 
     </bean>
 </beans>

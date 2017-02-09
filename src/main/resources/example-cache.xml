@@ -54,7 +54,7 @@
                         <list>
                             <bean class="org.apache.ignite.cache.QueryEntity">
                                 <property name="keyType" value="java.lang.String"/>
-                                <property name="valueType" value="cn.mucang.simple.nativecache.ignite.Person"/>
+                                <property name="valueType" value="cn.liang.nativecache.ignite.Person"/>
                                 <property name="fields">
                                     <map>
                                         <entry key="name" value="java.lang.String"/>

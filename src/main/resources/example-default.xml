@@ -68,7 +68,7 @@
                     <!-- 通读、通写配置 -->
                     <property name="cacheStoreFactory">
                         <bean class="javax.cache.configuration.FactoryBuilder" factory-method="factoryOf">
-                            <constructor-arg value="cn.mucang.simple.nativecache.ignite.cachestore.PersonCacheStore"/>
+                            <constructor-arg value="cn.liang.nativecache.ignite.cachestore.PersonCacheStore"/>
                         </bean>
                     </property>
                     <property name="readFromBackup" value="true"/>

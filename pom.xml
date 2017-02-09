@@ -36,24 +36,8 @@
     <artifactId>my-test</artifactId>
     <version>1.0-SNAPSHOT</version>
 
-    <parent>
-        <groupId>cn.mucang.simple</groupId>
-        <artifactId>simple-framework-parent</artifactId>
-        <version>2.7-SNAPSHOT</version>
-    </parent>
-
-
     <repositories>
-        <repository>
-            <id>nexus</id>
-            <name>Team Nexus Repository</name>
-            <url>http://nexus.mucang.cn:8081/nexus/content/groups/public</url>
-            <snapshots>
-                <checksumPolicy>warn</checksumPolicy>
-                <enabled>true</enabled>
-                <updatePolicy>interval:-1</updatePolicy>
-            </snapshots>
-        </repository>
+
         <repository>
             <id>clojars.org</id>
             <url>http://clojars.org/repo</url>
@@ -77,17 +61,6 @@
 
     </repositories>
 
-    <pluginRepositories>
-        <pluginRepository>
-            <id>nexus</id>
-            <name>Team Nexus Repository</name>
-            <url>http://nexus.mucang.cn:8081/nexus/content/groups/public</url>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </pluginRepository>
-    </pluginRepositories>
-
     <dependencies>
 
         <dependency>
@@ -98,16 +71,6 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.mucang.simple</groupId>
-            <artifactId>simple-mq</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.mucang.simple</groupId>
-            <artifactId>simple-utils</artifactId>
         </dependency>
 
         <dependency>
@@ -130,26 +93,9 @@
         </dependency>
 
         <dependency>
-            <groupId>cn.mucang.simple</groupId>
-            <artifactId>simple-sso-client</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>nginx-clojure</groupId>
             <artifactId>nginx-clojure</artifactId>
             <version>0.4.4</version>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.mucang.polaris</groupId>
-            <artifactId>polaris-sdk</artifactId>
-            <version>1.0-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.mucang.auth</groupId>
-            <artifactId>auth-sdk</artifactId>
-            <version>2.4-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -266,18 +212,6 @@
         </dependency>
 
         <dependency>
-            <groupId>cn.mucang.simple</groupId>
-            <artifactId>sso-sdk</artifactId>
-            <version>1.0-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.mucang.score.sdk</groupId>
-            <artifactId>score-center-sdk</artifactId>
-            <version>1.1-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi</artifactId>
             <version>3.10.1</version>
@@ -286,12 +220,6 @@
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>3.12</version>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.mucang.neptune</groupId>
-            <artifactId>neptune-sdk</artifactId>
-            <version>1.0-SNAPSHOT</version>
         </dependency>
 
         <!--阿里云sdk aliyun-java-sdk-[产品缩写] -->

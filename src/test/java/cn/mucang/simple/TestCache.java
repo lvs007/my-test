@@ -2,14 +2,10 @@ package cn.mucang.simple;
 
 import cn.mucang.polaris.manager.MonitorManager;
 import cn.mucang.simple.entity.TestEntity;
-import cn.mucang.simple.nativecache.action.FlushAction;
-import cn.mucang.simple.nativecache.action.FlushKeyAction;
-import cn.mucang.simple.nativecache.cache.CacheFactory;
-import cn.mucang.simple.nativecache.cache.CacheManager;
-import cn.mucang.simple.nativecache.cache.NativeCache;
-import cn.mucang.simple.nativecache.cache.NativeCacheOne;
-import cn.mucang.simple.nativecache.news.RedisCache;
-import cn.mucang.simple.nativecache.news.RedisCacheImpl;
+import cn.liang.nativecache.action.FlushKeyAction;
+import cn.liang.nativecache.cache.CacheFactory;
+import cn.liang.nativecache.cache.CacheManager;
+import cn.liang.nativecache.cache.NativeCache;
 import org.junit.Test;
 
 import java.util.*;
