@@ -23,4 +23,10 @@ public class ReflectUtils {
         field.setAccessible(false);
         return value;
     }
+
+    public static void setValue(Object object, Field field, Object value) throws IllegalAccessException {
+        field.setAccessible(true);
+        field.set(object, value);
+        field.setAccessible(false);
+    }
 }

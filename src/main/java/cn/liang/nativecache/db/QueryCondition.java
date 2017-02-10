@@ -10,10 +10,10 @@ public class QueryCondition {
     private Condition condition;
 
     public QueryCondition(String column, Object value, Condition condition) {
-        validValue(value, condition);
         this.column = column;
         this.value = value;
         this.condition = condition;
+        validValue(value, condition);
     }
 
     private void validValue(Object value, Condition condition) {
@@ -21,6 +21,10 @@ public class QueryCondition {
         if (condition == Condition.IN) {
             if (!valueType.contains("List") && !valueType.contains("[]")) {
                 throw new RuntimeException("错误的in参数，只能是List或者数组");
+            }
+        } else if (condition == Condition.GROUP_BY) {
+            if (valueType.contains("String") && valueType.contains("[]")) {
+
             }
         }
     }

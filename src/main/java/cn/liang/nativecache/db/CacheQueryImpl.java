@@ -121,7 +121,7 @@ public class CacheQueryImpl implements Query {
         if (groupByCondition == null) {
             return;
         }
-
+        midResult = MyTools.groupList("", midResult, (String[]) groupByCondition.getValue());
     }
 
     private <T> void orderBy(List<T> midResult, QueryCondition orderByCondition) {
